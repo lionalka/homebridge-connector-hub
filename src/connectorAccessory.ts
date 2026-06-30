@@ -269,12 +269,21 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
   updateBatteryService() {
     // We only update if we have an up-to-date device state.
     if (this.currentState) {
-      this.batteryService.updateCharacteristic(
-          this.platform.Characteristic.BatteryLevel,
-          getBatteryPercent(this.currentState.data.batteryLevel));
-      this.batteryService.updateCharacteristic(
-          this.platform.Characteristic.StatusLowBattery,
-          isLowBattery(this.currentState.data.batteryLevel));
+      // getBatteryPercent() returns -1 as a sentinel for "unknown" when the
+      // hub response is missing battery data (e.g. a TDBU device reporting
+      // only one motor's fields on a given read). HAP rejects BatteryLevel
+      // values outside 0-100, so pushing -1 through previously caused a
+      // "characteristic was supplied illegal value" warning on every such
+      // partial read. Skip the update instead, leaving Homekit showing the
+      // last known good value rather than an invalid one.
+      const batteryPC = getBatteryPercent(this.currentState.data.batteryLevel);
+      if (batteryPC >= 0) {
+        this.batteryService.updateCharacteristic(
+            this.platform.Characteristic.BatteryLevel, batteryPC);
+        this.batteryService.updateCharacteristic(
+            this.platform.Characteristic.StatusLowBattery,
+            isLowBattery(this.currentState.data.batteryLevel));
+      }
       this.batteryService.updateCharacteristic(
           this.platform.Characteristic.ChargingState,
           this.currentState.data.chargingState ||
