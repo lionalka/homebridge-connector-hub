@@ -343,6 +343,18 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     this.currentTargetPos = hubTarget;
     this.updateWindowCoveringService();
 
+    // Optimistically report the shade as arrived at its target so HomeKit
+    // clears "Closing..." / "Opening..." immediately after the hub acks the
+    // command, rather than waiting for the next periodic refresh (up to 10s)
+    // to bring back a position that matches the target. The refresh will
+    // correct the value if the motor didn't fully reach the target.
+    this.wcService.updateCharacteristic(
+        this.platform.Characteristic.CurrentPosition,
+        this.toHomekitPercent(hubTarget));
+    this.wcService.updateCharacteristic(
+        this.platform.Characteristic.PositionState,
+        this.platform.Characteristic.PositionState.STOPPED);
+
     // Log the result of the operation for the user.
     Log.info('Targeted:', [this.logName, targetVal]);
     Log.debug('Target response:', (ack || 'None'));
