@@ -10,6 +10,7 @@ export declare const kNetworkSettings: {
     retryDelayMs: number;
     refreshIntervalMs: number;
     commandSpacingMs: number;
+    sameDeviceSpacingMs: number;
 };
 export declare enum OperationState {
     CLOSED_CLOSING = 0,

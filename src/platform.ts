@@ -49,6 +49,7 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     kNetworkSettings.retryDelayMs = config.retryDelayMs;
     kNetworkSettings.refreshIntervalMs = config.refreshIntervalMs;
     kNetworkSettings.commandSpacingMs = config.commandSpacingMs;
+    kNetworkSettings.sameDeviceSpacingMs = config.sameDeviceSpacingMs;
 
     // Notify the user that we have completed platform initialization.
     Log.debug('Finished initializing platform');
@@ -75,6 +76,8 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     config.maxRetries = (config.maxRetries || kNetworkSettings.maxRetries);
     config.commandSpacingMs = (config.commandSpacingMs === undefined || config.commandSpacingMs === null) ?
         kNetworkSettings.commandSpacingMs : config.commandSpacingMs;
+    config.sameDeviceSpacingMs = (config.sameDeviceSpacingMs === undefined || config.sameDeviceSpacingMs === null) ?
+        kNetworkSettings.sameDeviceSpacingMs : config.sameDeviceSpacingMs;
     config.reverseDirection = (config.reverseDirection || []);
     config.hubIps = (config.hubIps || []);
     config.deviceNames = (config.deviceNames || []);
@@ -94,6 +97,9 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     }
     if (config.commandSpacingMs < 0) {
       validationErrors.push('Command spacing must be >= 0');
+    }
+    if (config.sameDeviceSpacingMs < 0) {
+      validationErrors.push('Same-device command spacing must be >= 0');
     }
     return validationErrors;
   }

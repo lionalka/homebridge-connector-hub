@@ -41,6 +41,7 @@ class ConnectorHubPlatform {
         connector_hub_constants_1.kNetworkSettings.retryDelayMs = config.retryDelayMs;
         connector_hub_constants_1.kNetworkSettings.refreshIntervalMs = config.refreshIntervalMs;
         connector_hub_constants_1.kNetworkSettings.commandSpacingMs = config.commandSpacingMs;
+        connector_hub_constants_1.kNetworkSettings.sameDeviceSpacingMs = config.sameDeviceSpacingMs;
         // Notify the user that we have completed platform initialization.
         log_1.Log.debug('Finished initializing platform');
         // This event is fired when Homebridge has restored all cached accessories.
@@ -64,6 +65,8 @@ class ConnectorHubPlatform {
         config.maxRetries = (config.maxRetries || connector_hub_constants_1.kNetworkSettings.maxRetries);
         config.commandSpacingMs = (config.commandSpacingMs === undefined || config.commandSpacingMs === null) ?
             connector_hub_constants_1.kNetworkSettings.commandSpacingMs : config.commandSpacingMs;
+        config.sameDeviceSpacingMs = (config.sameDeviceSpacingMs === undefined || config.sameDeviceSpacingMs === null) ?
+            connector_hub_constants_1.kNetworkSettings.sameDeviceSpacingMs : config.sameDeviceSpacingMs;
         config.reverseDirection = (config.reverseDirection || []);
         config.hubIps = (config.hubIps || []);
         config.deviceNames = (config.deviceNames || []);
@@ -83,6 +86,9 @@ class ConnectorHubPlatform {
         }
         if (config.commandSpacingMs < 0) {
             validationErrors.push('Command spacing must be >= 0');
+        }
+        if (config.sameDeviceSpacingMs < 0) {
+            validationErrors.push('Same-device command spacing must be >= 0');
         }
         return validationErrors;
     }

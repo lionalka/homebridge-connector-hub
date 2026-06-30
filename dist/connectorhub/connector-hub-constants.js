@@ -30,6 +30,12 @@ exports.kNetworkSettings = {
     // of which accessory they belong to. Avoids overwhelming the physical hub
     // when many devices are commanded at once (e.g. by a scene).
     commandSpacingMs: 150,
+    // Minimum delay enforced between two commands sent to the *same physical
+    // device* (matched by mac), on top of commandSpacingMs. Relevant for TDBU
+    // blinds, which expose two accessories (Top-Down, Bottom-Up) sharing one
+    // motor controller; some controllers ignore a second command that arrives
+    // too soon after the first, even if the first was a same-position no-op.
+    sameDeviceSpacingMs: 1200,
 };
 // Operation states that the hub may report.
 var OperationState;

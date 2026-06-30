@@ -89,6 +89,13 @@
       "required": true,
       "default": 150
     },
+    "sameDeviceSpacingMs": {
+      "title": "Same-Device Command Spacing",
+      "description": "Minimum delay in milliseconds between two commands sent to the same physical device (e.g. the Top-Down and Bottom-Up halves of a TDBU blind). Some motor controllers ignore a second command that arrives too soon after the first.",
+      "type": "integer",
+      "required": true,
+      "default": 1200
+    },
     "enableDebugLog": {
       "title": "Debug Logging",
       "type": "boolean",
@@ -149,6 +156,7 @@
         "maxRetries",
         "retryDelayMs",
         "commandSpacingMs",
+        "sameDeviceSpacingMs",
         "enableDebugLog"
       ]
     }

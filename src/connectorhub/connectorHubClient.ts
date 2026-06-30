@@ -18,14 +18,36 @@ type DeviceResponse = GetDeviceListAck|WriteDeviceAck|ReadDeviceAck;
 // the physical hub when many devices are commanded at once (e.g. during a
 // scene). Implemented as a serialized promise chain that enforces a minimum
 // delay between the start of each send, configurable via commandSpacingMs.
+//
+// On top of that, enforce a separate, typically longer minimum delay between
+// two commands sent to the *same physical device* (same mac), configurable
+// via sameDeviceSpacingMs. This matters for TDBU blinds, which expose two
+// Homekit accessories (Top-Down and Bottom-Up) that share one physical
+// motor controller. A scene commonly targets both halves within the same
+// burst; if the second command arrives too soon after the first — even when
+// the first is a same-position no-op — some motor controllers appear to
+// silently ignore it, acking the UDP request without actually moving.
+// Sending direct single commands to one half never hits this, which is what
+// first pointed at per-device timing rather than a general network issue.
 let lastSendTime = 0;
+const lastDeviceSendTime = new Map<string, number>();
 let sendChain: Promise<void> = Promise.resolve();
-function throttleSend(): Promise<void> {
+function throttleSend(mac?: string): Promise<void> {
   const scheduled = sendChain.then(() => new Promise<void>((resolve) => {
+    const now = Date.now();
     const spacingMs = kNetworkSettings.commandSpacingMs || 0;
-    const wait = Math.max(0, spacingMs - (Date.now() - lastSendTime));
+    let wait = Math.max(0, spacingMs - (now - lastSendTime));
+    if (mac) {
+      const deviceSpacingMs = kNetworkSettings.sameDeviceSpacingMs || 0;
+      const lastForDevice = lastDeviceSendTime.get(mac) || 0;
+      wait = Math.max(wait, deviceSpacingMs - (now - lastForDevice));
+    }
     setTimeout(() => {
-      lastSendTime = Date.now();
+      const sendTime = Date.now();
+      lastSendTime = sendTime;
+      if (mac) {
+        lastDeviceSendTime.set(mac, sendTime);
+      }
       resolve();
     }, wait);
   }));
@@ -41,7 +63,9 @@ async function sendCommandMultiResponse(
   const responses: DeviceResponse[] = [];
 
   // Wait for our turn in the global send queue before issuing this command.
-  await throttleSend();
+  // Pass the target mac (if present on this request type) so commands aimed
+  // at the same physical device get additional spacing from each other.
+  await throttleSend((cmdObj as {mac?: string}).mac);
 
   // Extract the retry settings specified in the plugin configuration.
   const [maxRetries, socketTimeoutMs] =
