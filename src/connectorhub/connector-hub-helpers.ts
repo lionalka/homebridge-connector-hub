@@ -7,6 +7,7 @@
 /* eslint-disable max-len */
 /* eslint-disable indent */
 import * as aesjs from 'aes-js';
+import {PlatformConfig} from 'homebridge';
 
 import {Log} from '../util/log';
 
@@ -127,7 +128,20 @@ export function extractHubMac(deviceMac: string): string {
   return deviceMac.slice(0, kMacAddrLength);
 }
 
-export function makeDeviceName(devInfo: ExtendedDeviceInfo): string {
+export function makeDeviceName(
+    devInfo: ExtendedDeviceInfo, config?: PlatformConfig): string {
+  // If the user configured a friendly name for this device's full MAC (hub
+  // MAC + device number), use it instead of the generated name. For TDBU
+  // devices, append the Top-Down/Bottom-Up suffix so the two halves of the
+  // same physical unit remain distinguishable, matching the convention used
+  // by the generated name below.
+  const override = (config?.deviceNames as Array<{mac: string; name: string}>|
+                     undefined)
+                        ?.find((entry) => entry.mac === devInfo.mac)
+                        ?.name;
+  if (override) {
+    return `${override}${devInfo.tdbuType}`;
+  }
   // The format of a device's MAC is [hub_mac][device_num] where the former is a
   // 12-character hex string and the latter is a 4-digit hex string. If this is
   // a WiFi motor which does not have a hub, device_num can be empty.

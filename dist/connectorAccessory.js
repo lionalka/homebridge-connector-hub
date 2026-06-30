@@ -69,7 +69,7 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
     setAccessoryInformation(deviceState) {
         const Characteristic = this.platform.Characteristic;
         // Update the accessory display name, in case it wasn't set already.
-        this.accessory.displayName = (0, connector_hub_helpers_1.makeDeviceName)(this.deviceInfo);
+        this.accessory.displayName = (0, connector_hub_helpers_1.makeDeviceName)(this.deviceInfo, this.config);
         this.platform.api.updatePlatformAccessories([this.accessory]);
         // Set the service names. These are the default names displayed by Homekit.
         this.wcService.setCharacteristic(Characteristic.Name, this.accessory.displayName);

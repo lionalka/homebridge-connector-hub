@@ -77,6 +77,7 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
         kNetworkSettings.commandSpacingMs : config.commandSpacingMs;
     config.reverseDirection = (config.reverseDirection || []);
     config.hubIps = (config.hubIps || []);
+    config.deviceNames = (config.deviceNames || []);
     // Check for invalid entries and compile a list of all validation errors.
     const invalidIps = config.hubIps.filter((ip: string) => !isIPv4(ip));
     for (const invalidIp of invalidIps) {
@@ -171,7 +172,7 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
       const uuid = this.api.hap.uuid.generate(deviceInfo.mac + tdbuType);
 
       // Generate a display name for the device from the extended device info.
-      const displayName = makeDeviceName(deviceInfo);
+      const displayName = makeDeviceName(deviceInfo, this.config);
 
       // Check whether we have already registered this device in this session.
       if (this.accessoryHandlers.some(elem => elem.accessory.UUID === uuid)) {

@@ -120,7 +120,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     const Characteristic = this.platform.Characteristic;
 
     // Update the accessory display name, in case it wasn't set already.
-    this.accessory.displayName = makeDeviceName(this.deviceInfo);
+    this.accessory.displayName = makeDeviceName(this.deviceInfo, this.config);
     this.platform.api.updatePlatformAccessories([this.accessory]);
 
     // Set the service names. These are the default names displayed by Homekit.

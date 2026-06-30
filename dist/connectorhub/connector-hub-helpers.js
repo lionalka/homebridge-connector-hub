@@ -128,7 +128,17 @@ function extractHubMac(deviceMac) {
     return deviceMac.slice(0, connector_hub_constants_1.kMacAddrLength);
 }
 exports.extractHubMac = extractHubMac;
-function makeDeviceName(devInfo) {
+function makeDeviceName(devInfo, config) {
+    var _a, _b;
+    // If the user configured a friendly name for this device's full MAC (hub
+    // MAC + device number), use it instead of the generated name. For TDBU
+    // devices, append the Top-Down/Bottom-Up suffix so the two halves of the
+    // same physical unit remain distinguishable, matching the convention used
+    // by the generated name below.
+    const override = (_b = (_a = config === null || config === void 0 ? void 0 : config.deviceNames) === null || _a === void 0 ? void 0 : _a.find((entry) => entry.mac === devInfo.mac)) === null || _b === void 0 ? void 0 : _b.name;
+    if (override) {
+        return `${override}${devInfo.tdbuType}`;
+    }
     // The format of a device's MAC is [hub_mac][device_num] where the former is a
     // 12-character hex string and the latter is a 4-digit hex string. If this is
     // a WiFi motor which does not have a hub, device_num can be empty.

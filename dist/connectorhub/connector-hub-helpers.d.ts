@@ -1,3 +1,4 @@
+import { PlatformConfig } from 'homebridge';
 import { DeviceCmd, DeviceInfo, DeviceModel, DeviceType, GetDeviceListReq, ReadDeviceAck, ReadDeviceReq, WriteDeviceAck, WriteDeviceReq } from './connector-hub-api';
 export declare enum TDBUType {
     kNone = "",
@@ -20,7 +21,7 @@ export declare function isInvalidAck(ack: WriteDeviceAck | ReadDeviceAck): strin
 export declare function isWifiBridge(deviceType: DeviceType): boolean;
 export declare function getDeviceModel(type: string, subType?: number, tdbuType?: TDBUType): string;
 export declare function extractHubMac(deviceMac: string): string;
-export declare function makeDeviceName(devInfo: ExtendedDeviceInfo): string;
+export declare function makeDeviceName(devInfo: ExtendedDeviceInfo, config?: PlatformConfig): string;
 export declare function getBatteryPercent(batteryLevel?: number): number;
 export declare function isLowBattery(batteryLevel: number): boolean;
 export declare function spliceIndexOf(arr: any[], value: any): number;

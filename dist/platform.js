@@ -66,6 +66,7 @@ class ConnectorHubPlatform {
             connector_hub_constants_1.kNetworkSettings.commandSpacingMs : config.commandSpacingMs;
         config.reverseDirection = (config.reverseDirection || []);
         config.hubIps = (config.hubIps || []);
+        config.deviceNames = (config.deviceNames || []);
         // Check for invalid entries and compile a list of all validation errors.
         const invalidIps = config.hubIps.filter((ip) => !(0, net_1.isIPv4)(ip));
         for (const invalidIp of invalidIps) {
@@ -148,7 +149,7 @@ class ConnectorHubPlatform {
             // TDBU type to differentiate the top down from the bottom up accessory.
             const uuid = this.api.hap.uuid.generate(deviceInfo.mac + tdbuType);
             // Generate a display name for the device from the extended device info.
-            const displayName = (0, connector_hub_helpers_1.makeDeviceName)(deviceInfo);
+            const displayName = (0, connector_hub_helpers_1.makeDeviceName)(deviceInfo, this.config);
             // Check whether we have already registered this device in this session.
             if (this.accessoryHandlers.some(elem => elem.accessory.UUID === uuid)) {
                 continue;

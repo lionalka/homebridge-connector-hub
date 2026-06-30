@@ -21,6 +21,29 @@
         "format": "ipv4"
       }
     },
+    "deviceNames": {
+      "title": "Friendly Device Names",
+      "description": "Override the generated device name for specific devices, by Serial Number, e.g. for easier identification in Homekit and in the logs. For TDBU devices, the Top-Down/Bottom-Up suffix is appended automatically.",
+      "type": "array",
+      "buttonText": "Add Friendly Name",
+      "required": false,
+      "minLength": 0,
+      "items": {
+        "type": "object",
+        "properties": {
+          "mac": {
+            "title": "Serial Number",
+            "type": "string",
+            "required": true
+          },
+          "name": {
+            "title": "Friendly Name",
+            "type": "string",
+            "required": true
+          }
+        }
+      }
+    },
     "reverseDirection": {
       "title": "Reverse Direction",
       "description": "If some of your devices move in the opposite of the expected direction, add their Serial Numbers here.",
@@ -95,6 +118,14 @@
           "type": "array",
           "items": [
             "hubIps[]"
+          ]
+        },
+        {
+          "key": "deviceNames",
+          "type": "array",
+          "items": [
+            "deviceNames[].mac",
+            "deviceNames[].name"
           ]
         }
       ]
