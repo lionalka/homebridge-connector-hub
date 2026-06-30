@@ -55,12 +55,22 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
   private lastRssiWarningTime = 0;
   private lastLowBatteryWarningTime = 0;
 
+  // Name used in log output only, distinct from accessory.displayName (which
+  // is what Homekit shows in the Home app). Appends the raw device serial so
+  // a device remains traceable in the logs by its physical identifier even
+  // when a friendly deviceNames override hides the generated name that would
+  // otherwise have included it.
+  private readonly logName: string;
+
   constructor(
       private readonly platform: ConnectorHubPlatform,
       public readonly accessory: PlatformAccessory,
   ) {
     // Initialize the superclass constructor.
     super(<ExtendedDeviceInfo>accessory.context.device, platform.config);
+
+    this.logName = `${makeDeviceName(this.deviceInfo, platform.config)} (${
+        this.deviceInfo.mac})`;
 
     // Create a new client connection for this device.
     this.client = new ConnectorHubClient(
@@ -179,12 +189,12 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
 
     // If we didn't hear back from the device, exit early.
     if (!newState) {
-      Log.debug('Periodic refresh failed:', this.accessory.displayName);
+      Log.debug('Periodic refresh failed:', this.logName);
       return;
     }
 
     // Log a debug message showing the new device state received from the hub.
-    Log.debug(`Latest ${this.accessory.displayName} state:`, newState);
+    Log.debug(`Latest ${this.logName} state:`, newState);
 
     // Sanitize the device state for the specific device that we are handling.
     this.currentState = newState = this.sanitizeDeviceState(newState);
@@ -200,7 +210,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     if (newState.data.currentPosition !== lastPos) {
       // Log a message for the user to signify that the position has changed.
       const newPos = this.toHomekitPercent(newState.data.currentPosition);
-      Log.info('Updating position:', [this.accessory.displayName, newPos]);
+      Log.info('Updating position:', [this.logName, newPos]);
 
       // The hub updates only after completing each movement. Update the target
       // position to match the new currentPosition. Usually this is a no-op, but
@@ -215,7 +225,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     const batteryPC = getBatteryPercent(newState?.data.batteryLevel);
     if (batteryPC !== lastBatteryPC) {
       // Log a message for the user, then push the new battery state to Homekit.
-      Log.info('Updating battery:', [this.accessory.displayName, batteryPC]);
+      Log.info('Updating battery:', [this.logName, batteryPC]);
       this.updateBatteryService();
     }
 
@@ -235,13 +245,13 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     if (rssi !== undefined && rssi <= kLowRssiThreshold &&
         now - this.lastRssiWarningTime >= kHealthWarningRepeatMs) {
       Log.warn(
-          'Weak signal:', [this.accessory.displayName, `${rssi} dBm`]);
+          'Weak signal:', [this.logName, `${rssi} dBm`]);
       this.lastRssiWarningTime = now;
     }
     if (isLowBattery(state?.data.batteryLevel ?? 100) &&
         now - this.lastLowBatteryWarningTime >= kHealthWarningRepeatMs) {
       Log.warn(
-          'Low battery:', [this.accessory.displayName, `${batteryPC}%`]);
+          'Low battery:', [this.logName, `${batteryPC}%`]);
       this.lastLowBatteryWarningTime = now;
     }
   }
@@ -310,7 +320,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     // hub, or if the ack is invalid, throw a communications error to Homekit.
     if (!ack || isInvalidAck(ack)) {
       Log.error(
-          `Failed to set ${this.accessory.displayName} to ${targetVal}:`,
+          `Failed to set ${this.logName} to ${targetVal}:`,
           (ack || 'No response from hub'));
       ConnectorAccessory.recordSceneBatchResult(false);
       throw new this.platform.api.hap.HapStatusError(
@@ -322,7 +332,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     this.updateWindowCoveringService();
 
     // Log the result of the operation for the user.
-    Log.info('Targeted:', [this.accessory.displayName, targetVal]);
+    Log.info('Targeted:', [this.logName, targetVal]);
     Log.debug('Target response:', (ack || 'None'));
     ConnectorAccessory.recordSceneBatchResult(true);
   }
@@ -369,7 +379,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     }
     // Target is cached in Connector hub format, convert to Homekit format.
     const currentTarget = this.toHomekitPercent(this.currentTargetPos);
-    Log.debug('Returning target:', [this.accessory.displayName, currentTarget]);
+    Log.debug('Returning target:', [this.logName, currentTarget]);
     return currentTarget;
   }
 
@@ -380,14 +390,14 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
    */
   async getCurrentPosition(): Promise<CharacteristicValue> {
     if (!this.currentState) {
-      Log.debug('Failed to get position:', this.accessory.displayName);
+      Log.debug('Failed to get position:', this.logName);
       throw new this.platform.api.hap.HapStatusError(
           this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     }
     // Position is cached in Connector hub format, convert to Homekit format.
     const currentPos =
         this.toHomekitPercent(this.currentState.data.currentPosition);
-    Log.debug('Returning position:', [this.accessory.displayName, currentPos]);
+    Log.debug('Returning position:', [this.logName, currentPos]);
     return currentPos;
   }
 
@@ -415,7 +425,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     }
     const posState = this.getDirection(
         this.currentState.data.currentPosition, this.currentTargetPos);
-    Log.debug('Returning pos state:', [this.accessory.displayName, posState]);
+    Log.debug('Returning pos state:', [this.logName, posState]);
     return posState;
   }
 }

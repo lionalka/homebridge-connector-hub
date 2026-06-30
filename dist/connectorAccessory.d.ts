@@ -22,6 +22,7 @@ export declare class ConnectorAccessory extends ConnectorDeviceHandler {
     private activeReadTimer;
     private lastRssiWarningTime;
     private lastLowBatteryWarningTime;
+    private readonly logName;
     constructor(platform: ConnectorHubPlatform, accessory: PlatformAccessory);
     setAccessoryInformation(deviceState: ReadDeviceAck): void;
     /**
