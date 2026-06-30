@@ -12,6 +12,7 @@ The original symptom: triggering a HomeKit scene with many shades at once caused
 
 - **`commandSpacingMs` (new config option, default 150ms)** — staggers every outgoing UDP command across all accessories, so a large scene doesn't fire commands at every shade simultaneously and overwhelm the physical hub's processing/radio. Implemented as a serialized promise queue in `connectorHubClient.ts`.
 - **TDBU position fallback fix** — previously, if a device read was missing position data entirely (some TDBU units intermittently or permanently omit one motor's fields from a hub response), the plugin reset that accessory's position to a hardcoded "half-open" placeholder (50). This caused affected accessories to get stuck reporting a meaningless fixed value forever, even once good data resumed. Now the last known real position is preserved instead, so the accessory holds its last-known-good state through gaps rather than flapping back to a fake value.
+- **TDBU command ordering (`tdbuBottomUpDelayMs`, new config option, default 150ms)** — HomeKit dispatches scene commands to all accessories nearly simultaneously, in an unpredictable order. On some TDBU motor controllers, sending a Bottom-Up command causes the unit to ignore any subsequent Top-Down command for an extended period — regardless of how much time passes between them. This caused the Top-Down half of TDBU shades to silently fail in scenes whenever HomeKit happened to send Bottom-Up first. The fix: Bottom-Up commands wait `tdbuBottomUpDelayMs` before entering the send queue, giving a Top-Down command for the same mac time to queue ahead of it. All Top-Down commands now reliably precede their Bottom-Up counterpart at the hub. Direct individual control of a single half is unaffected beyond the small delay.
 - **Jittered retry timeouts** — retry attempts now use a randomized ±20% timeout instead of a fixed delay, so if several devices end up retrying around the same moment (e.g. the hub was briefly overwhelmed during a scene), their retries don't re-converge and re-trigger the same congestion.
 - **Staggered background polling** — every accessory's periodic refresh timer used to start at the same instant (plugin startup), so background status polling for ~25+ devices burst in lockstep every refresh cycle, competing with scene commands landing in the same window. Each accessory's timer now starts with an offset derived from `commandSpacingMs`, spreading background polling continuously across the refresh interval instead of bursting.
 
@@ -31,6 +32,7 @@ The original symptom: triggering a HomeKit scene with many shades at once caused
 | Option | Default | Description |
 |---|---|---|
 | `commandSpacingMs` | `150` | Minimum delay (ms) enforced between consecutive outgoing commands to the hub. |
+| `tdbuBottomUpDelayMs` | `150` | How long (ms) a Bottom-Up TDBU command waits before entering the send queue, ensuring Top-Down goes first. Set to 0 to disable. |
 | `deviceNames` | `[]` | Array of `{mac, name}` entries overriding the generated name for specific devices, by Serial Number. |
 
 ## Operational note for maintainers
