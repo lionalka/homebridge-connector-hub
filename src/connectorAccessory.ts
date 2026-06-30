@@ -4,7 +4,7 @@ import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
 
 import {ReadDeviceAck} from './connectorhub/connector-hub-api';
 import {kHealthWarningRepeatMs, kLowRssiThreshold, kNetworkSettings, ReadDeviceType} from './connectorhub/connector-hub-constants';
-import {ExtendedDeviceInfo, getBatteryPercent, getDeviceModel, isInvalidAck, isLowBattery, makeDeviceName} from './connectorhub/connector-hub-helpers';
+import {ExtendedDeviceInfo, getBatteryPercent, getDeviceModel, isInvalidAck, isLowBattery, makeDeviceName, TDBUType} from './connectorhub/connector-hub-helpers';
 import {ConnectorDeviceHandler, ReadDeviceResponse, WriteDeviceResponse} from './connectorhub/connectorDeviceHandler';
 import {ConnectorHubClient} from './connectorhub/connectorHubClient';
 import {ConnectorHubPlatform} from './platform';
@@ -310,6 +310,18 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     // Adjust the target value from Homekit to Hub values, and construct a
     // target request appropriate to this device.
     const [hubTarget, targetReq] = this.makeTargetRequest(<number>targetVal);
+
+    // For Bottom-Up TDBU accessories, delay before entering the send queue so
+    // that a Top-Down command for the same physical motor — dispatched by
+    // HomeKit in the same scene burst — has time to queue ahead of us.
+    // This guarantees Top-Down always precedes Bottom-Up at the hub regardless
+    // of which order HomeKit happened to dispatch them.
+    if (this.deviceInfo.tdbuType === TDBUType.kBottomUp) {
+      const delayMs = kNetworkSettings.tdbuBottomUpDelayMs || 0;
+      if (delayMs > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+      }
+    }
 
     // Send the targeting request in the appropriate format for this device.
     const ack = <WriteDeviceResponse>await (() => {

@@ -89,6 +89,13 @@
       "required": true,
       "default": 150
     },
+    "tdbuBottomUpDelayMs": {
+      "title": "TDBU Bottom-Up Delay",
+      "description": "How long (ms) a Bottom-Up command waits before entering the send queue, giving a Top-Down command for the same motor time to go first. Increase if HomeKit is slow to dispatch scene commands (e.g. via iCloud relay). Set to 0 to disable.",
+      "type": "integer",
+      "required": true,
+      "default": 150
+    },
     "enableDebugLog": {
       "title": "Debug Logging",
       "type": "boolean",
@@ -149,6 +156,7 @@
         "maxRetries",
         "retryDelayMs",
         "commandSpacingMs",
+        "tdbuBottomUpDelayMs",
         "enableDebugLog"
       ]
     }
