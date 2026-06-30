@@ -59,6 +59,13 @@
       "required": true,
       "default": 250
     },
+    "commandSpacingMs": {
+      "title": "Command Spacing",
+      "description": "Minimum delay in milliseconds enforced between consecutive commands sent to the hub, to avoid overwhelming it when many shades move at once (e.g. in a scene).",
+      "type": "integer",
+      "required": true,
+      "default": 150
+    },
     "enableDebugLog": {
       "title": "Debug Logging",
       "type": "boolean",
@@ -110,6 +117,7 @@
         "refreshIntervalMs",
         "maxRetries",
         "retryDelayMs",
+        "commandSpacingMs",
         "enableDebugLog"
       ]
     }

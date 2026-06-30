@@ -146,10 +146,17 @@ export class ConnectorDeviceHandler {
     }
     // If we reach here, then no exact position information can be deduced.
     Log.debug('No explicit position data in device state:', deviceState);
-    // The blind is stopped somewhere between closed and open. We approximate
-    // this by setting the position to half-open. The periodic update routine
-    // will assume that the movement has completed and will set the target
-    // position to the same value, so we will end up in a consistent state.
+    // Prefer the last known real position over a guess, since the hub
+    // sometimes omits position fields entirely on a given read (e.g. TDBU
+    // devices that report only one half of their state at a time). Using the
+    // last known position avoids overwriting good data with a meaningless
+    // half-open placeholder, which previously caused affected accessories to
+    // get stuck reporting a fixed, incorrect position indefinitely.
+    if (this.lastState?.data.currentPosition !== undefined) {
+      deviceState.data.currentPosition = this.lastState.data.currentPosition;
+      return deviceState;
+    }
+    // No prior state to fall back on either; approximate as half-open.
     deviceState.data.currentPosition = kHalfOpenValue;
     return deviceState;
   }

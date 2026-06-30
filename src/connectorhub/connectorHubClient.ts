@@ -14,12 +14,34 @@ import {computeAccessToken, makeGetDeviceListRequest, makeReadDeviceRequest, mak
 type DeviceRequest = GetDeviceListReq|WriteDeviceReq|ReadDeviceReq;
 type DeviceResponse = GetDeviceListAck|WriteDeviceAck|ReadDeviceAck;
 
+// Stagger outgoing UDP sends across all accessories so we don't overwhelm
+// the physical hub when many devices are commanded at once (e.g. during a
+// scene). Implemented as a serialized promise chain that enforces a minimum
+// delay between the start of each send, configurable via commandSpacingMs.
+let lastSendTime = 0;
+let sendChain: Promise<void> = Promise.resolve();
+function throttleSend(): Promise<void> {
+  const scheduled = sendChain.then(() => new Promise<void>((resolve) => {
+    const spacingMs = kNetworkSettings.commandSpacingMs || 0;
+    const wait = Math.max(0, spacingMs - (Date.now() - lastSendTime));
+    setTimeout(() => {
+      lastSendTime = Date.now();
+      resolve();
+    }, wait);
+  }));
+  sendChain = scheduled;
+  return scheduled;
+}
+
 // Function to send a request to the hub and receive a sequence of responses.
 async function sendCommandMultiResponse(
     cmdObj: DeviceRequest, ip: string,
     expectSingleResponse = false): Promise<DeviceResponse[]> {
   // Array of responses received from the hub(s).
   const responses: DeviceResponse[] = [];
+
+  // Wait for our turn in the global send queue before issuing this command.
+  await throttleSend();
 
   // Extract the retry settings specified in the plugin configuration.
   const [maxRetries, socketTimeoutMs] =

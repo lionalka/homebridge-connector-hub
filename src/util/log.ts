@@ -13,16 +13,23 @@ export class Log {
     Log.internalLog = internalLog;
   }
 
+  // Collapse object parameters to single-line JSON so multi-line util.inspect
+  // dumps don't get split into separate timestamped log entries by Docker /
+  // journald, which made debug output unreadable and hard to grep.
+  private static flatten(parameters: any[]): any[] {
+    return parameters.map((p) => (typeof p === 'object' && p !== null) ? JSON.stringify(p) : p);
+  }
+
   public static info(message: string, ...parameters: any[]): void {
-    Log.internalLog.info(message, ...parameters);
+    Log.internalLog.info(message, ...Log.flatten(parameters));
   }
 
   public static warn(message: string, ...parameters: any[]): void {
-    Log.internalLog.warn(message, ...parameters);
+    Log.internalLog.warn(message, ...Log.flatten(parameters));
   }
 
   public static error(message: string, ...parameters: any[]): void {
-    Log.internalLog.error(message, ...parameters);
+    Log.internalLog.error(message, ...Log.flatten(parameters));
   }
 
   // Homebridge only outputs debug-level messages when the entire instance has
@@ -30,7 +37,7 @@ export class Log {
   // signify debug messages when the user has enabled verbose logging.
   public static debug(message: string, ...parameters: any[]): void {
     if (Log.enableDebugLog) {
-      Log.internalLog.info(`[DEBUG] ${message}`, ...parameters);
+      Log.internalLog.info(`[DEBUG] ${message}`, ...Log.flatten(parameters));
     }
   }
 }

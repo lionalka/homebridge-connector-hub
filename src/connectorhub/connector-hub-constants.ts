@@ -20,6 +20,10 @@ export const kNetworkSettings = {
   maxRetries: 2,
   retryDelayMs: 250,
   refreshIntervalMs: 10000,
+  // Minimum delay enforced between consecutive outgoing commands, regardless
+  // of which accessory they belong to. Avoids overwhelming the physical hub
+  // when many devices are commanded at once (e.g. by a scene).
+  commandSpacingMs: 150,
 };
 
 // Operation states that the hub may report.

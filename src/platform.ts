@@ -48,6 +48,7 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     kNetworkSettings.maxRetries = config.maxRetries;
     kNetworkSettings.retryDelayMs = config.retryDelayMs;
     kNetworkSettings.refreshIntervalMs = config.refreshIntervalMs;
+    kNetworkSettings.commandSpacingMs = config.commandSpacingMs;
 
     // Notify the user that we have completed platform initialization.
     Log.debug('Finished initializing platform');
@@ -72,6 +73,8 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     config.retryDelayMs =
         (config.retryDelayMs || kNetworkSettings.retryDelayMs);
     config.maxRetries = (config.maxRetries || kNetworkSettings.maxRetries);
+    config.commandSpacingMs = (config.commandSpacingMs === undefined || config.commandSpacingMs === null) ?
+        kNetworkSettings.commandSpacingMs : config.commandSpacingMs;
     config.reverseDirection = (config.reverseDirection || []);
     config.hubIps = (config.hubIps || []);
     // Check for invalid entries and compile a list of all validation errors.
@@ -87,6 +90,9 @@ export class ConnectorHubPlatform implements DynamicPlatformPlugin {
     }
     if (config.retryDelayMs <= 0) {
       validationErrors.push('Request retry delay must be > 0');
+    }
+    if (config.commandSpacingMs < 0) {
+      validationErrors.push('Command spacing must be >= 0');
     }
     return validationErrors;
   }
