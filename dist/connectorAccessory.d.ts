@@ -11,12 +11,17 @@ export declare class ConnectorAccessory extends ConnectorDeviceHandler {
     readonly accessory: PlatformAccessory;
     private static readonly kActiveReadInterval;
     private performActiveRead;
+    private static instanceCount;
+    private static sceneBatch;
+    private static readonly kSceneBatchQuietPeriodMs;
     private client;
     private batteryService;
     private wcService;
     private currentTargetPos;
     private periodicRefreshTimer;
     private activeReadTimer;
+    private lastRssiWarningTime;
+    private lastLowBatteryWarningTime;
     constructor(platform: ConnectorHubPlatform, accessory: PlatformAccessory);
     setAccessoryInformation(deviceState: ReadDeviceAck): void;
     /**
@@ -31,6 +36,7 @@ export declare class ConnectorAccessory extends ConnectorDeviceHandler {
      * device state when a movement completes.
      */
     updateDeviceStatus(): Promise<void>;
+    private maybeWarnDeviceHealth;
     updateWindowCoveringService(): void;
     updateBatteryService(): void;
     /**
@@ -39,6 +45,15 @@ export declare class ConnectorAccessory extends ConnectorDeviceHandler {
      * if the hub cannot be contacted.
      */
     setTargetPosition(targetVal: CharacteristicValue): Promise<void>;
+    /**
+     * Tracks setTargetPosition calls landing close together in time (e.g. all
+     * the commands fired by a single Homekit scene) and logs one summary line
+     * once the burst goes quiet, instead of requiring the user to count
+     * individual "Targeted:" lines to know whether a scene fully succeeded.
+     * Single, isolated commands (not part of a burst) are not summarized,
+     * since the per-accessory "Targeted:" line already covers that case.
+     */
+    private static recordSceneBatchResult;
     getTargetPosition(): Promise<CharacteristicValue>;
     /**
      * Handle "get CurrentPosition" requests from HomeKit. Returns the most recent

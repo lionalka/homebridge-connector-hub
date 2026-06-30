@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.stateModes = exports.voltageModes = exports.wirelessModes = exports.deviceModels = exports.deviceTypes = exports.hubStats = exports.opCodes = exports.ReadDeviceType = exports.OperationState = exports.kNetworkSettings = exports.kHalfOpenValue = exports.kMacAddrLength = exports.kLowBatteryPercent = exports.kSendPort = exports.kMulticastIp = void 0;
+exports.stateModes = exports.voltageModes = exports.wirelessModes = exports.deviceModels = exports.deviceTypes = exports.hubStats = exports.opCodes = exports.ReadDeviceType = exports.OperationState = exports.kNetworkSettings = exports.kHalfOpenValue = exports.kMacAddrLength = exports.kHealthWarningRepeatMs = exports.kLowRssiThreshold = exports.kLowBatteryPercent = exports.kSendPort = exports.kMulticastIp = void 0;
 const connector_hub_api_1 = require("./connector-hub-api");
 /*
  * Constants defined by the Connector hub protocol and by this plugin.
@@ -9,6 +9,14 @@ exports.kMulticastIp = '238.0.0.18';
 exports.kSendPort = 32100;
 // Battery level constants.
 exports.kLowBatteryPercent = 15;
+// RSSI (dBm) at or below which we log a warning about a weak signal. Devices
+// at or below this level are at meaningfully higher risk of dropped commands
+// and stale state.
+exports.kLowRssiThreshold = -95;
+// Minimum time between repeated low-signal/low-battery warnings for the same
+// accessory, so a persistently weak device doesn't spam the log every
+// refresh cycle.
+exports.kHealthWarningRepeatMs = 30 * 60 * 1000;
 // Length of a hub's MAC address, excluding colons.
 exports.kMacAddrLength = 12;
 // The value at which devices are half-open, regardless of direction.

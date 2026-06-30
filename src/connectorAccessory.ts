@@ -3,7 +3,7 @@
 import {CharacteristicValue, PlatformAccessory, Service} from 'homebridge';
 
 import {ReadDeviceAck} from './connectorhub/connector-hub-api';
-import {kNetworkSettings, ReadDeviceType} from './connectorhub/connector-hub-constants';
+import {kHealthWarningRepeatMs, kLowRssiThreshold, kNetworkSettings, ReadDeviceType} from './connectorhub/connector-hub-constants';
 import {ExtendedDeviceInfo, getBatteryPercent, getDeviceModel, isInvalidAck, isLowBattery, makeDeviceName} from './connectorhub/connector-hub-helpers';
 import {ConnectorDeviceHandler, ReadDeviceResponse, WriteDeviceResponse} from './connectorhub/connectorDeviceHandler';
 import {ConnectorHubClient} from './connectorhub/connectorHubClient';
@@ -19,6 +19,21 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
   private static readonly kActiveReadInterval = 60 * 60 * 1000;
   private performActiveRead = true;
 
+  // Tracks how many ConnectorAccessory instances have been constructed so
+  // far, used only to stagger each accessory's periodic refresh start time
+  // (see below). Not reset between discovery passes, which is fine since we
+  // only use it to compute a spread offset, not an identity.
+  private static instanceCount = 0;
+
+  // Tracks an in-flight "batch" of setTargetPosition calls landing close
+  // together in time (e.g. all the commands from a single Homekit scene), so
+  // we can log one summary line instead of one line per accessory. Static
+  // because a scene spans many ConnectorAccessory instances.
+  private static sceneBatch:
+      {count: number; failed: number; startTime: number;
+       flushTimer?: NodeJS.Timeout} = {count: 0, failed: 0, startTime: 0};
+  private static readonly kSceneBatchQuietPeriodMs = 1500;
+
   // Network client used to communicate with the hub.
   private client: ConnectorHubClient;
 
@@ -30,8 +45,15 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
   private currentTargetPos = -1;
 
   // Handlers for the periodic refresh and active read timers.
-  private periodicRefreshTimer: NodeJS.Timer;
+  // Assigned shortly after construction, once the stagger delay elapses; see
+  // the constructor.
+  private periodicRefreshTimer!: NodeJS.Timer;
   private activeReadTimer: NodeJS.Timer;
+
+  // Timestamps of the last low-signal / low-battery warnings logged for this
+  // accessory, used to avoid repeating the same warning every refresh cycle.
+  private lastRssiWarningTime = 0;
+  private lastLowBatteryWarningTime = 0;
 
   constructor(
       private readonly platform: ConnectorHubPlatform,
@@ -55,10 +77,22 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
         this.accessory.getService(this.platform.Service.Battery) ||
         this.accessory.addService(this.platform.Service.Battery);
 
-    // Initialize the device state and set up a periodic refresh.
+    // Initialize the device state immediately, but stagger the start of this
+    // accessory's periodic refresh timer relative to its siblings. Without
+    // this, every accessory's timer is created within the same instant at
+    // startup, so background polling bursts all devices at once every
+    // refresh cycle instead of spreading smoothly across it. We reuse
+    // commandSpacingMs as the per-device offset unit so the spread scales
+    // with whatever the hub has already been tuned to tolerate.
     this.updateDeviceStatus();
-    this.periodicRefreshTimer = setInterval(
-        () => this.updateDeviceStatus(), kNetworkSettings.refreshIntervalMs);
+    const staggerOffsetMs = kNetworkSettings.refreshIntervalMs > 0 ?
+        (ConnectorAccessory.instanceCount++ * kNetworkSettings.commandSpacingMs) %
+            kNetworkSettings.refreshIntervalMs :
+        0;
+    setTimeout(() => {
+      this.periodicRefreshTimer = setInterval(
+          () => this.updateDeviceStatus(), kNetworkSettings.refreshIntervalMs);
+    }, staggerOffsetMs);
 
     // Set up a timer to indicate when we should perform active reads.
     this.activeReadTimer = setInterval(() => {
@@ -184,6 +218,32 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
       Log.info('Updating battery:', [this.accessory.displayName, batteryPC]);
       this.updateBatteryService();
     }
+
+    // Surface weak signal / low battery at info level, not just buried in
+    // debug logs, since both are leading indicators of a device going fully
+    // unresponsive (acking commands but never actually moving). Repeated
+    // warnings for the same condition are throttled so a persistently weak
+    // device doesn't spam the log every refresh cycle.
+    this.maybeWarnDeviceHealth(newState, batteryPC);
+  }
+
+  // Logs a warning if this device's signal strength or battery level looks
+  // unhealthy, throttled to at most once per kHealthWarningRepeatMs.
+  private maybeWarnDeviceHealth(state: ReadDeviceResponse, batteryPC: number) {
+    const now = Date.now();
+    const rssi = state?.data.RSSI;
+    if (rssi !== undefined && rssi <= kLowRssiThreshold &&
+        now - this.lastRssiWarningTime >= kHealthWarningRepeatMs) {
+      Log.warn(
+          'Weak signal:', [this.accessory.displayName, `${rssi} dBm`]);
+      this.lastRssiWarningTime = now;
+    }
+    if (isLowBattery(state?.data.batteryLevel ?? 100) &&
+        now - this.lastLowBatteryWarningTime >= kHealthWarningRepeatMs) {
+      Log.warn(
+          'Low battery:', [this.accessory.displayName, `${batteryPC}%`]);
+      this.lastLowBatteryWarningTime = now;
+    }
   }
 
   // Push the current status of the window covering properties to Homekit.
@@ -243,6 +303,7 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
       Log.error(
           `Failed to set ${this.accessory.displayName} to ${targetVal}:`,
           (ack || 'No response from hub'));
+      ConnectorAccessory.recordSceneBatchResult(false);
       throw new this.platform.api.hap.HapStatusError(
           this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
     }
@@ -254,6 +315,41 @@ export class ConnectorAccessory extends ConnectorDeviceHandler {
     // Log the result of the operation for the user.
     Log.info('Targeted:', [this.accessory.displayName, targetVal]);
     Log.debug('Target response:', (ack || 'None'));
+    ConnectorAccessory.recordSceneBatchResult(true);
+  }
+
+  /**
+   * Tracks setTargetPosition calls landing close together in time (e.g. all
+   * the commands fired by a single Homekit scene) and logs one summary line
+   * once the burst goes quiet, instead of requiring the user to count
+   * individual "Targeted:" lines to know whether a scene fully succeeded.
+   * Single, isolated commands (not part of a burst) are not summarized,
+   * since the per-accessory "Targeted:" line already covers that case.
+   */
+  private static recordSceneBatchResult(success: boolean) {
+    const batch = ConnectorAccessory.sceneBatch;
+    if (!batch.flushTimer) {
+      batch.count = 0;
+      batch.failed = 0;
+      batch.startTime = Date.now();
+    } else {
+      clearTimeout(batch.flushTimer);
+    }
+    batch.count++;
+    if (!success) {
+      batch.failed++;
+    }
+    batch.flushTimer = setTimeout(() => {
+      if (batch.count > 1) {
+        const elapsedSec = ((Date.now() - batch.startTime) / 1000).toFixed(1);
+        const succeeded = batch.count - batch.failed;
+        Log.info(
+            'Scene batch:',
+            `${succeeded}/${batch.count} acked, ${batch.failed} failed, ${
+                elapsedSec}s`);
+      }
+      batch.flushTimer = undefined;
+    }, ConnectorAccessory.kSceneBatchQuietPeriodMs);
   }
 
   async getTargetPosition(): Promise<CharacteristicValue> {

@@ -19,6 +19,10 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         this.performActiveRead = true;
         // Current target position for this device.
         this.currentTargetPos = -1;
+        // Timestamps of the last low-signal / low-battery warnings logged for this
+        // accessory, used to avoid repeating the same warning every refresh cycle.
+        this.lastRssiWarningTime = 0;
+        this.lastLowBatteryWarningTime = 0;
         // Create a new client connection for this device.
         this.client = new connectorHubClient_1.ConnectorHubClient(this.platform.config, this.deviceInfo, this.deviceInfo.hubIp, this.deviceInfo.hubToken);
         // Get the WindowCovering service if it exists, otherwise create one.
@@ -29,9 +33,21 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         this.batteryService =
             this.accessory.getService(this.platform.Service.Battery) ||
                 this.accessory.addService(this.platform.Service.Battery);
-        // Initialize the device state and set up a periodic refresh.
+        // Initialize the device state immediately, but stagger the start of this
+        // accessory's periodic refresh timer relative to its siblings. Without
+        // this, every accessory's timer is created within the same instant at
+        // startup, so background polling bursts all devices at once every
+        // refresh cycle instead of spreading smoothly across it. We reuse
+        // commandSpacingMs as the per-device offset unit so the spread scales
+        // with whatever the hub has already been tuned to tolerate.
         this.updateDeviceStatus();
-        this.periodicRefreshTimer = setInterval(() => this.updateDeviceStatus(), connector_hub_constants_1.kNetworkSettings.refreshIntervalMs);
+        const staggerOffsetMs = connector_hub_constants_1.kNetworkSettings.refreshIntervalMs > 0 ?
+            (ConnectorAccessory.instanceCount++ * connector_hub_constants_1.kNetworkSettings.commandSpacingMs) %
+                connector_hub_constants_1.kNetworkSettings.refreshIntervalMs :
+            0;
+        setTimeout(() => {
+            this.periodicRefreshTimer = setInterval(() => this.updateDeviceStatus(), connector_hub_constants_1.kNetworkSettings.refreshIntervalMs);
+        }, staggerOffsetMs);
         // Set up a timer to indicate when we should perform active reads.
         this.activeReadTimer = setInterval(() => {
             this.performActiveRead = true;
@@ -135,6 +151,29 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
             log_1.Log.info('Updating battery:', [this.accessory.displayName, batteryPC]);
             this.updateBatteryService();
         }
+        // Surface weak signal / low battery at info level, not just buried in
+        // debug logs, since both are leading indicators of a device going fully
+        // unresponsive (acking commands but never actually moving). Repeated
+        // warnings for the same condition are throttled so a persistently weak
+        // device doesn't spam the log every refresh cycle.
+        this.maybeWarnDeviceHealth(newState, batteryPC);
+    }
+    // Logs a warning if this device's signal strength or battery level looks
+    // unhealthy, throttled to at most once per kHealthWarningRepeatMs.
+    maybeWarnDeviceHealth(state, batteryPC) {
+        var _a;
+        const now = Date.now();
+        const rssi = state === null || state === void 0 ? void 0 : state.data.RSSI;
+        if (rssi !== undefined && rssi <= connector_hub_constants_1.kLowRssiThreshold &&
+            now - this.lastRssiWarningTime >= connector_hub_constants_1.kHealthWarningRepeatMs) {
+            log_1.Log.warn('Weak signal:', [this.accessory.displayName, `${rssi} dBm`]);
+            this.lastRssiWarningTime = now;
+        }
+        if ((0, connector_hub_helpers_1.isLowBattery)((_a = state === null || state === void 0 ? void 0 : state.data.batteryLevel) !== null && _a !== void 0 ? _a : 100) &&
+            now - this.lastLowBatteryWarningTime >= connector_hub_constants_1.kHealthWarningRepeatMs) {
+            log_1.Log.warn('Low battery:', [this.accessory.displayName, `${batteryPC}%`]);
+            this.lastLowBatteryWarningTime = now;
+        }
     }
     // Push the current status of the window covering properties to Homekit.
     updateWindowCoveringService() {
@@ -174,6 +213,7 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         // hub, or if the ack is invalid, throw a communications error to Homekit.
         if (!ack || (0, connector_hub_helpers_1.isInvalidAck)(ack)) {
             log_1.Log.error(`Failed to set ${this.accessory.displayName} to ${targetVal}:`, (ack || 'No response from hub'));
+            ConnectorAccessory.recordSceneBatchResult(false);
             throw new this.platform.api.hap.HapStatusError(-70402 /* SERVICE_COMMUNICATION_FAILURE */);
         }
         // Record the current targeted position, and inform Homekit.
@@ -182,6 +222,38 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         // Log the result of the operation for the user.
         log_1.Log.info('Targeted:', [this.accessory.displayName, targetVal]);
         log_1.Log.debug('Target response:', (ack || 'None'));
+        ConnectorAccessory.recordSceneBatchResult(true);
+    }
+    /**
+     * Tracks setTargetPosition calls landing close together in time (e.g. all
+     * the commands fired by a single Homekit scene) and logs one summary line
+     * once the burst goes quiet, instead of requiring the user to count
+     * individual "Targeted:" lines to know whether a scene fully succeeded.
+     * Single, isolated commands (not part of a burst) are not summarized,
+     * since the per-accessory "Targeted:" line already covers that case.
+     */
+    static recordSceneBatchResult(success) {
+        const batch = ConnectorAccessory.sceneBatch;
+        if (!batch.flushTimer) {
+            batch.count = 0;
+            batch.failed = 0;
+            batch.startTime = Date.now();
+        }
+        else {
+            clearTimeout(batch.flushTimer);
+        }
+        batch.count++;
+        if (!success) {
+            batch.failed++;
+        }
+        batch.flushTimer = setTimeout(() => {
+            if (batch.count > 1) {
+                const elapsedSec = ((Date.now() - batch.startTime) / 1000).toFixed(1);
+                const succeeded = batch.count - batch.failed;
+                log_1.Log.info('Scene batch:', `${succeeded}/${batch.count} acked, ${batch.failed} failed, ${elapsedSec}s`);
+            }
+            batch.flushTimer = undefined;
+        }, ConnectorAccessory.kSceneBatchQuietPeriodMs);
     }
     async getTargetPosition() {
         // If a target position hasn't been set yet, report a communication error.
@@ -237,4 +309,15 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
 exports.ConnectorAccessory = ConnectorAccessory;
 // Interval at which we actively rather than passively read the device state.
 ConnectorAccessory.kActiveReadInterval = 60 * 60 * 1000;
+// Tracks how many ConnectorAccessory instances have been constructed so
+// far, used only to stagger each accessory's periodic refresh start time
+// (see below). Not reset between discovery passes, which is fine since we
+// only use it to compute a spread offset, not an identity.
+ConnectorAccessory.instanceCount = 0;
+// Tracks an in-flight "batch" of setTargetPosition calls landing close
+// together in time (e.g. all the commands from a single Homekit scene), so
+// we can log one summary line instead of one line per accessory. Static
+// because a scene spans many ConnectorAccessory instances.
+ConnectorAccessory.sceneBatch = { count: 0, failed: 0, startTime: 0 };
+ConnectorAccessory.kSceneBatchQuietPeriodMs = 1500;
 //# sourceMappingURL=connectorAccessory.js.map

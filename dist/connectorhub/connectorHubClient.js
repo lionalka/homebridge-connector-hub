@@ -48,8 +48,13 @@ async function sendCommandMultiResponse(cmdObj, ip, expectSingleResponse = false
             let response;
             do {
                 // Set a maximum timeout for the request. If we get a response within
-                // the timeout, clear the timeout for the next iteration.
-                const timer = setTimeout(() => socket.close(), socketTimeoutMs);
+                // the timeout, clear the timeout for the next iteration. Add up to
+                // 20% random jitter so that if several devices end up retrying at
+                // once (e.g. the hub was briefly overwhelmed during a large scene),
+                // their retries don't all land back on the hub in lockstep and
+                // re-trigger the same congestion.
+                const jitteredTimeoutMs = socketTimeoutMs + Math.floor(Math.random() * socketTimeoutMs * 0.2);
+                const timer = setTimeout(() => socket.close(), jitteredTimeoutMs);
                 const recvMsg = await sendResult && await socket.recv();
                 // Try to parse the response and add it to the list of responses.
                 if ((response = recvMsg && (0, connector_hub_helpers_1.tryParse)(recvMsg.msg.toString()))) {
