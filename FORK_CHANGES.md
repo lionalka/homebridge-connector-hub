@@ -24,12 +24,14 @@ The original symptom: triggering a HomeKit scene with many shades at once caused
   ```
   This answers "did the scene actually work" without cross-referencing one log line per accessory.
 - **Low signal / low battery warnings** — RSSI and battery level are now checked on every refresh and logged as a `warn` (throttled to at most once per 30 minutes per accessory) when they cross an unhealthy threshold (RSSI ≤ -95 dBm, battery ≤ 15%). Previously this data only existed buried in debug-only state dumps. Both turned out to be leading indicators of a device silently going unresponsive — acking commands but never actually moving — well before that became visible as a failed scene.
+- **Friendly device names (`deviceNames`)** — the plugin generates accessory names like `Honeycomb Blinds 09-08f9e02da0e4` purely from device model + MAC, since the hub protocol doesn't carry a custom name field. `deviceNames` lets you override this per device, by Serial Number, with a friendly name — applied to the Homekit accessory *and* every log line (not just a cosmetic Home-app rename, which never reaches the logs). TDBU devices automatically get the Top-Down/Bottom-Up suffix appended so both halves stay distinguishable.
 
 ## New config options
 
 | Option | Default | Description |
 |---|---|---|
 | `commandSpacingMs` | `150` | Minimum delay (ms) enforced between consecutive outgoing commands to the hub. |
+| `deviceNames` | `[]` | Array of `{mac, name}` entries overriding the generated name for specific devices, by Serial Number. |
 
 ## Operational note for maintainers
 
