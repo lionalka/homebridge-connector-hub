@@ -12,8 +12,13 @@ class Log {
     // Collapse object parameters to single-line JSON so multi-line util.inspect
     // dumps don't get split into separate timestamped log entries by Docker /
     // journald, which made debug output unreadable and hard to grep.
+    //
+    // accessToken is the derived per-command hub credential (see
+    // connector-hub-helpers.ts computeAccessToken); it must never reach the
+    // log, since Homebridge logs are commonly shared for support/debugging.
     static flatten(parameters) {
-        return parameters.map((p) => (typeof p === 'object' && p !== null) ? JSON.stringify(p) : p);
+        return parameters.map((p) => (typeof p === 'object' && p !== null) ?
+            JSON.stringify(p, (key, value) => key === 'accessToken' ? '[REDACTED]' : value) : p);
     }
     static info(message, ...parameters) {
         Log.internalLog.info(message, ...Log.flatten(parameters));
