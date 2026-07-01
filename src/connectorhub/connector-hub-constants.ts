@@ -12,7 +12,7 @@ export const kLowBatteryPercent = 15;
 // RSSI (dBm) at or below which we log a warning about a weak signal. Devices
 // at or below this level are at meaningfully higher risk of dropped commands
 // and stale state.
-export const kLowRssiThreshold = -95;
+export const kLowRssiThreshold = -100;
 
 // Minimum time between repeated low-signal/low-battery warnings for the same
 // accessory, so a persistently weak device doesn't spam the log every
