@@ -216,6 +216,17 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         // Adjust the target value from Homekit to Hub values, and construct a
         // target request appropriate to this device.
         const [hubTarget, targetReq] = this.makeTargetRequest(targetVal);
+        // For Bottom-Up TDBU accessories, delay before entering the send queue so
+        // that a Top-Down command for the same physical motor — dispatched by
+        // HomeKit in the same scene burst — has time to queue ahead of us.
+        // This guarantees Top-Down always precedes Bottom-Up at the hub regardless
+        // of which order HomeKit happened to dispatch them.
+        if (this.deviceInfo.tdbuType === connector_hub_helpers_1.TDBUType.kBottomUp) {
+            const delayMs = connector_hub_constants_1.kNetworkSettings.tdbuBottomUpDelayMs || 0;
+            if (delayMs > 0) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
         // Send the targeting request in the appropriate format for this device.
         const ack = await (() => {
             return this.client.setDeviceState(targetReq);
@@ -230,6 +241,13 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
         // Record the current targeted position, and inform Homekit.
         this.currentTargetPos = hubTarget;
         this.updateWindowCoveringService();
+        // Optimistically report the shade as arrived at its target so HomeKit
+        // clears "Closing..." / "Opening..." immediately after the hub acks the
+        // command, rather than waiting for the next periodic refresh (up to 10s)
+        // to bring back a position that matches the target. The refresh will
+        // correct the value if the motor didn't fully reach the target.
+        this.wcService.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.toHomekitPercent(hubTarget));
+        this.wcService.updateCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
         // Log the result of the operation for the user.
         log_1.Log.info('Targeted:', [this.logName, targetVal]);
         log_1.Log.debug('Target response:', (ack || 'None'));

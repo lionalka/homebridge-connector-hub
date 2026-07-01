@@ -1,7 +1,7 @@
 export declare const kMulticastIp = "238.0.0.18";
 export declare const kSendPort = 32100;
 export declare const kLowBatteryPercent = 15;
-export declare const kLowRssiThreshold = -95;
+export declare const kLowRssiThreshold = -100;
 export declare const kHealthWarningRepeatMs: number;
 export declare const kMacAddrLength = 12;
 export declare const kHalfOpenValue = 50;
@@ -10,6 +10,7 @@ export declare const kNetworkSettings: {
     retryDelayMs: number;
     refreshIntervalMs: number;
     commandSpacingMs: number;
+    tdbuBottomUpDelayMs: number;
 };
 export declare enum OperationState {
     CLOSED_CLOSING = 0,

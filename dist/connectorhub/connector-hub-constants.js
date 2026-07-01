@@ -12,7 +12,7 @@ exports.kLowBatteryPercent = 15;
 // RSSI (dBm) at or below which we log a warning about a weak signal. Devices
 // at or below this level are at meaningfully higher risk of dropped commands
 // and stale state.
-exports.kLowRssiThreshold = -95;
+exports.kLowRssiThreshold = -100;
 // Minimum time between repeated low-signal/low-battery warnings for the same
 // accessory, so a persistently weak device doesn't spam the log every
 // refresh cycle.
@@ -30,6 +30,12 @@ exports.kNetworkSettings = {
     // of which accessory they belong to. Avoids overwhelming the physical hub
     // when many devices are commanded at once (e.g. by a scene).
     commandSpacingMs: 150,
+    // How long a Bottom-Up TDBU command waits before entering the send queue,
+    // giving a Top-Down command for the same mac time to queue ahead of it.
+    // HomeKit sends both halves of a TDBU pair nearly simultaneously during a
+    // scene; this window ensures Top-Down always precedes Bottom-Up at the hub,
+    // regardless of which order HomeKit happened to dispatch them.
+    tdbuBottomUpDelayMs: 150,
 };
 // Operation states that the hub may report.
 var OperationState;
