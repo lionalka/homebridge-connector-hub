@@ -45,12 +45,6 @@ var DeviceState;
     DeviceState[DeviceState["kLimitsDetected"] = 3] = "kLimitsDetected";
     DeviceState[DeviceState["kThirdLimitDetected"] = 4] = "kThirdLimitDetected";
 })(DeviceState || (DeviceState = {}));
-var HubState;
-(function (HubState) {
-    HubState[HubState["kWorking"] = 1] = "kWorking";
-    HubState[HubState["kPairing"] = 2] = "kPairing";
-    HubState[HubState["kUpdating"] = 3] = "kUpdating";
-})(HubState || (HubState = {}));
 var VoltageMode;
 (function (VoltageMode) {
     VoltageMode[VoltageMode["kACMotor"] = 0] = "kACMotor";

@@ -228,9 +228,7 @@ class ConnectorAccessory extends connectorDeviceHandler_1.ConnectorDeviceHandler
             }
         }
         // Send the targeting request in the appropriate format for this device.
-        const ack = await (() => {
-            return this.client.setDeviceState(targetReq);
-        })();
+        const ack = await this.client.setDeviceState(targetReq);
         // If we didn't receive an ack, or if the ack reports an exception from the
         // hub, or if the ack is invalid, throw a communications error to Homekit.
         if (!ack || (0, connector_hub_helpers_1.isInvalidAck)(ack)) {

@@ -42,12 +42,6 @@ enum DeviceState {
   kThirdLimitDetected = 4
 }
 
-enum HubState {
-  kWorking = 1,
-  kPairing = 2,
-  kUpdating = 3
-}
-
 enum VoltageMode {
   kACMotor = 0,
   kDCMotor = 1
@@ -100,25 +94,10 @@ export interface DeviceStatusTDBU extends DeviceStatus {
   batteryLevel_B: number;
 }
 
-interface HeartbeatData {
-  currentState: HubState;
-  numberOfDevices: number;
-  RSSI: number;
-}
-
 export interface DeviceCmd {
   operation?: DeviceOpCode;
   targetPosition?: number;
   targetAngle?: number;
-}
-
-// Not used at present, since Homekit does not support TDBU blinds.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface DeviceCmdTDBU extends DeviceCmd {
-  operation_T?: DeviceOpCode;
-  operation_B?: DeviceOpCode;
-  targetPosition_T?: number;
-  targetPosition_B?: number;
 }
 
 //
@@ -173,21 +152,3 @@ export interface ReadDeviceAck {
   actionResult?: string;
 }
 
-// Sent to connected clients every 30-60s. Not used at present.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface Heartbeat {
-  msgType: 'Heartbeat';
-  mac: string;
-  deviceType: DeviceType;
-  token: string;
-  data: HeartbeatData;
-}
-
-// Sent to client on completion of an operation. Not used at present.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-interface Report {
-  msgType: 'Report';
-  mac: string;
-  deviceType: DeviceType;
-  data: DeviceStatus;
-}
